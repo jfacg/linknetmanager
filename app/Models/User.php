@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\UserACLTrait;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -9,7 +10,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, UserACLTrait;
 
     /**
      * The attributes that are mass assignable.
@@ -40,4 +41,27 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    public function profiles()
+    {  
+        return $this->belongsToMany(Profile::class);
+    }
+
+    public function profilesAvailable( $filter = null)
+    {
+        $profiles = Profile::whereNotIn ('profiles.id', function ($query)
+        {
+            $query->select('profile_user.profile_id');
+            $query->from('profile_user');
+            $query->whereRaw("profile_user.user_id={$this->id}");
+
+        })->where(function ($queryFilter) use ($filter)
+        {
+            if($filter)
+                $queryFilter->where('profiles.name', 'LIKE', "%{$filter}%");
+        })
+          ->paginate();
+
+        return $profiles;
+    }
 }
